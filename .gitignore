@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+venv/
+env/
+ENV/
+
+# Output and Models
+output/*
+!output/.keep
+models/*.pt
+!models/.keep
+input/*
+!input/.keep
+
+# IDEs
+.idea/
+.vscode/
+*.swp
