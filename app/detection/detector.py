@@ -1,11 +1,21 @@
 import os
+from abc import ABC, abstractmethod
 from ultralytics import YOLO
 from app.utils.logger import get_logger
 from app.config.settings import settings
 
 logger = get_logger(__name__)
 
-class YOLODetector:
+class Detector(ABC):
+    @abstractmethod
+    def detect(self, frame, conf=None, iou=None):
+        pass
+        
+    @abstractmethod
+    def track(self, frame, conf=None, iou=None, persist=True):
+        pass
+
+class YOLODetector(Detector):
     def __init__(self, model_path: str = None, device: str = None):
         self.model_path = model_path or settings.MODEL_PATH
         self.device = device or settings.DEVICE
@@ -42,6 +52,6 @@ class YOLODetector:
             iou=iou_thresh,
             device=self.device if self.device else None,
             verbose=False,
-            tracker="botsort.yaml" # Use default tracker config
+            tracker=settings.TRACKER
         )
         return results[0]

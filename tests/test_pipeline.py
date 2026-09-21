@@ -15,9 +15,9 @@ def test_statistics_manager():
     manager = StatisticsManager()
     
     frame_data = [
-        {"class_id": 0, "track_id": 1},
-        {"class_id": 0, "track_id": 2},
-        {"class_id": 32, "track_id": 3}
+        {"class_id": 0, "class_name": "person", "track_id": 1, "confidence": 0.9},
+        {"class_id": 0, "class_name": "person", "track_id": 2, "confidence": 0.8},
+        {"class_id": 32, "class_name": "sports ball", "track_id": 3, "confidence": 0.7}
     ]
     
     manager.update_frame_stats(frame_data)

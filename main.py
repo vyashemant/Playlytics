@@ -2,6 +2,7 @@ import argparse
 import time
 import os
 import sys
+import json
 
 from app.config.settings import settings
 from app.utils.logger import get_logger
@@ -10,6 +11,8 @@ from app.video.writer import VideoWriter
 from app.detection.detector import YOLODetector
 from app.detection.tracker import TrackerManager
 from app.analytics.statistics import StatisticsManager
+from app.analytics.tracking_data import TrackingDataManager
+from app.analytics.movement import MovementAnalyzer
 
 logger = get_logger(__name__)
 
@@ -51,6 +54,16 @@ def main():
         
     tracker = TrackerManager()
     stats_manager = StatisticsManager()
+    tracking_data_manager = TrackingDataManager(
+        fps=video_info['fps'], 
+        width=video_info['width'], 
+        height=video_info['height']
+    )
+    movement_analyzer = MovementAnalyzer(
+        fps=video_info['fps'],
+        width=video_info['width'],
+        height=video_info['height']
+    )
     
     logger.info("Processing video...\n")
     
@@ -65,11 +78,11 @@ def main():
                 results = detector.track(frame)
                 
                 # Process and extract data
-                frame_data = tracker.process_results(results, frame_idx, timestamp)
+                frame_data = tracker.process_results(results, frame_idx, timestamp, class_names=detector.model.names)
                 stats_manager.update_frame_stats(frame_data)
                 
                 # Annotate and write
-                annotated_frame = tracker.annotate_frame(frame, frame_data, detector.model.names)
+                annotated_frame = tracker.annotate_frame(frame, frame_data, fps=video_info['fps'], total_frames=video_info['total_frames'])
                 writer.write_frame(annotated_frame)
                 
                 # Progress update
@@ -83,20 +96,40 @@ def main():
                     
     except Exception as e:
         logger.error(f"\nError during processing: {e}")
-    finally:
         reader.release()
+        sys.exit(1)
+        
+    reader.release()
         
     processing_time = time.time() - start_time
-    stats_manager.finalize(video_info, processing_time)
+    
+    track_summaries = tracker.get_track_summaries()
+    stats_manager.finalize(video_info, processing_time, track_summaries)
+    
+    tracking_data_manager.add_tracks(tracker.get_all_tracking_data())
+    
+    # Run Movement Analysis
+    movement_data = movement_analyzer.analyze(tracker.tracks.values())
     
     stats_path = os.path.join(os.path.dirname(output_path), "statistics.json")
+    tracking_data_path = os.path.join(os.path.dirname(output_path), "tracking_data.json")
+    movement_data_path = os.path.join(os.path.dirname(output_path), "movement_analysis.json")
+    
     stats_manager.save(stats_path)
+    tracking_data_manager.save(tracking_data_path)
+    
+    with open(movement_data_path, "w") as f:
+        json.dump(movement_data, f, indent=4)
     
     print("\n")
     logger.info("Processing completed.\n")
     logger.info("Output:")
     logger.info(f"{output_path}")
     logger.info(f"{stats_path}")
+    logger.info(f"{tracking_data_path}")
+    logger.info(f"{movement_data_path}")
 
 if __name__ == "__main__":
     main()
+
+
