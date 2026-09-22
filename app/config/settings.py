@@ -31,4 +31,21 @@ class Settings:
     # Movement Analytics
     MOVEMENT_THRESHOLD_PIXELS = float(os.getenv("MOVEMENT_THRESHOLD_PIXELS", "2.0"))
 
+    # Ball Detection & Tracking
+    BALL_MODEL_PATH = os.getenv("BALL_MODEL_PATH", MODEL_PATH)
+    BALL_CONFIDENCE_THRESHOLD = float(os.getenv("BALL_CONFIDENCE_THRESHOLD", "0.2"))
+    BALL_IOU_THRESHOLD = float(os.getenv("BALL_IOU_THRESHOLD", "0.45"))
+    
+    _ball_classes_str = os.getenv("BALL_CLASS_NAMES", "['sports ball', 'cricket_ball']")
+    try:
+        BALL_CLASS_NAMES = ast.literal_eval(_ball_classes_str)
+    except (ValueError, SyntaxError):
+        BALL_CLASS_NAMES = ['sports ball', 'cricket_ball']
+        
+    BALL_MAX_MISSED_FRAMES = int(os.getenv("BALL_MAX_MISSED_FRAMES", "5"))
+    BALL_SMOOTHING_ENABLED = os.getenv("BALL_SMOOTHING_ENABLED", "True").lower() == "true"
+    BALL_SMOOTHING_ALPHA = float(os.getenv("BALL_SMOOTHING_ALPHA", "0.5"))
+    BALL_BOUNCE_MIN_VERTICAL_DISPLACEMENT = float(os.getenv("BALL_BOUNCE_MIN_VERTICAL_DISPLACEMENT", "5.0"))
+    BALL_BOUNCE_MIN_TIME_SECONDS = float(os.getenv("BALL_BOUNCE_MIN_TIME_SECONDS", "0.2"))
+
 settings = Settings()
