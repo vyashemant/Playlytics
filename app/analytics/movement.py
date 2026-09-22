@@ -12,6 +12,7 @@ class MovementAnalyzer:
         
     def analyze(self, tracks: Iterable[PlayerTrack]) -> Dict[str, Any]:
         """Analyze all tracks and return structured movement analysis."""
+        tracks = list(tracks)
         players_data = []
         
         for track in tracks:

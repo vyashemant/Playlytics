@@ -65,11 +65,38 @@ pytest tests/
 ## Roadmap
 - Phase 1: Computer Vision Foundation (Completed)
 - Phase 2: Cricket Detection & Tracking (Completed)
-- Phase 3: Player Movement Analytics (Current)
-- Phase 4: Ball Trajectory & Event Detection (Next)
+- Phase 3: Player Movement Analytics (Completed)
+- Phase 4: Ball Trajectory & Event Detection (Completed)
 - Phase 5: Pose estimation
 - Phase 6: Shot/bowling analysis
 - Phase 7: Performance scoring
 - Phase 8: React analytics dashboard
 - Phase 9: Backend/API
 - Phase 10: Deployment
+
+## Phase 4: Ball Trajectory & Cricket Event Detection (Implemented)
+
+**Status:** CODE COMPLETE — REAL BALL DETECTION NOT VALIDATED
+
+Phase 4 introduces the foundation for modular ball detection, trajectory analysis, and conservative geometry-based event detection (such as candidates for bounces and direction changes). 
+
+### New Capabilities
+- **Ball Detection Abstraction**: Configurable thresholds and model paths for ball detection (`BallDetector`).
+- **Trajectory Analyzer**: Pixel-space movement metrics (velocity, acceleration) and optional exponential smoothing.
+- **Event Detector**: Analyzes trajectories for `trajectory_start`, `bounce_candidate`, `direction_change_candidate`, and `trajectory_end`.
+- **JSON Output**: Generates `output/ball_tracking.json` with detailed trajectory data.
+
+### Configuration
+You can configure ball tracking behavior in your `.env` file using the following variables:
+- `BALL_MODEL_PATH`
+- `BALL_CONFIDENCE_THRESHOLD`
+- `BALL_IOU_THRESHOLD`
+- `BALL_CLASS_NAMES`
+- `BALL_MAX_MISSED_FRAMES`
+- `BALL_SMOOTHING_ENABLED`
+- `BALL_SMOOTHING_ALPHA`
+- `BALL_BOUNCE_MIN_VERTICAL_DISPLACEMENT`
+- `BALL_BOUNCE_MIN_TIME_SECONDS`
+
+### Limitations
+**The default COCO YOLO model (`yolo11n.pt`) is not a cricket-specific ball detector.** While the infrastructure is completely implemented, the generic model does not reliably detect the cricket ball in testing. The system honestly reports `no_reliable_ball_detected` when this occurs, generating an empty trajectory rather than fabricating data. Reliable cricket-ball tracking will require a custom model trained specifically on cricket balls.

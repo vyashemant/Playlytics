@@ -14,6 +14,11 @@ from app.analytics.statistics import StatisticsManager
 from app.analytics.tracking_data import TrackingDataManager
 from app.analytics.movement import MovementAnalyzer
 
+from app.detection.ball_detector import BallDetector
+from app.tracking.ball_tracker import BallTracker
+from app.analytics.ball_trajectory import BallTrajectoryAnalyzer
+from app.analytics.ball_events import BallEventDetector
+
 logger = get_logger(__name__)
 
 def parse_args():
@@ -65,6 +70,11 @@ def main():
         height=video_info['height']
     )
     
+    ball_detector = BallDetector(shared_model=detector.model if settings.BALL_MODEL_PATH == settings.MODEL_PATH else None)
+    ball_tracker = BallTracker()
+    ball_trajectory_analyzer = BallTrajectoryAnalyzer()
+    ball_event_detector = BallEventDetector()
+    
     logger.info("Processing video...\n")
     
     start_time = time.time()
@@ -77,12 +87,43 @@ def main():
                 # Run tracking
                 results = detector.track(frame)
                 
+                # Process ball detection
+                if ball_detector.shared_model:
+                    ball_detections = ball_detector.extract_from_results(results, frame_idx, timestamp, detector.model.names)
+                else:
+                    ball_detections = ball_detector.detect(frame, frame_idx, timestamp)
+                    
+                ball_tracker.update(ball_detections, frame_idx)
+                
                 # Process and extract data
                 frame_data = tracker.process_results(results, frame_idx, timestamp, class_names=detector.model.names)
                 stats_manager.update_frame_stats(frame_data)
                 
+                # Inject ball for annotation
+                if ball_tracker.active_trajectory:
+                    latest_ball = ball_tracker.active_trajectory[-1]
+                    if latest_ball["frame_number"] == frame_idx:
+                        frame_data.append({
+                            "track_id": latest_ball["track_id"],
+                            "confidence": latest_ball["confidence"],
+                            "bbox": latest_ball["bbox"],
+                            "class_name": latest_ball["class_name"],
+                            "frame_number": frame_idx,
+                            "timestamp": timestamp,
+                            "center": latest_ball.get("center", [])
+                        })
+                        
                 # Annotate and write
                 annotated_frame = tracker.annotate_frame(frame, frame_data, fps=video_info['fps'], total_frames=video_info['total_frames'])
+                
+                # Optional: draw trajectory line
+                if len(ball_tracker.active_trajectory) > 1:
+                    import cv2
+                    for i in range(1, len(ball_tracker.active_trajectory)):
+                        pt1 = tuple(map(int, ball_tracker.active_trajectory[i-1]["center"]))
+                        pt2 = tuple(map(int, ball_tracker.active_trajectory[i]["center"]))
+                        cv2.line(annotated_frame, pt1, pt2, (0, 165, 255), 2)
+                        
                 writer.write_frame(annotated_frame)
                 
                 # Progress update
@@ -111,15 +152,47 @@ def main():
     # Run Movement Analysis
     movement_data = movement_analyzer.analyze(tracker.tracks.values())
     
+    # Finalize Ball Tracking
+    ball_tracker.finalize()
+    ball_trajectory = ball_tracker.get_trajectory()
+    ball_analysis = ball_trajectory_analyzer.analyze(ball_trajectory)
+    
+    if ball_tracker.tracking_status == "reliable_trajectory":
+        ball_events = ball_event_detector.detect_events(ball_analysis)
+    else:
+        ball_events = []
+    
+    ball_tracking_output = {
+        "video": {
+            "fps": video_info['fps'],
+            "width": video_info['width'],
+            "height": video_info['height'],
+            "duration_seconds": round(video_info['total_frames'] / max(video_info['fps'], 1), 2)
+        },
+        "ball": {
+            "tracking_status": ball_tracker.tracking_status,
+            "track_id": ball_tracker.best_trajectory[0]["track_id"] if ball_tracker.best_trajectory else None,
+            "frames_observed": len(ball_tracker.best_trajectory),
+            "first_seen_frame": ball_tracker.best_trajectory[0]["frame_number"] if ball_tracker.best_trajectory else None,
+            "last_seen_frame": ball_tracker.best_trajectory[-1]["frame_number"] if ball_tracker.best_trajectory else None,
+        },
+        "trajectory": ball_analysis,
+        "events": ball_events
+    }
+    
     stats_path = os.path.join(os.path.dirname(output_path), "statistics.json")
     tracking_data_path = os.path.join(os.path.dirname(output_path), "tracking_data.json")
     movement_data_path = os.path.join(os.path.dirname(output_path), "movement_analysis.json")
+    ball_data_path = os.path.join(os.path.dirname(output_path), "ball_tracking.json")
     
     stats_manager.save(stats_path)
     tracking_data_manager.save(tracking_data_path)
     
     with open(movement_data_path, "w") as f:
         json.dump(movement_data, f, indent=4)
+        
+    with open(ball_data_path, "w") as f:
+        json.dump(ball_tracking_output, f, indent=4)
     
     print("\n")
     logger.info("Processing completed.\n")
@@ -128,6 +201,7 @@ def main():
     logger.info(f"{stats_path}")
     logger.info(f"{tracking_data_path}")
     logger.info(f"{movement_data_path}")
+    logger.info(f"{ball_data_path}")
 
 if __name__ == "__main__":
     main()
